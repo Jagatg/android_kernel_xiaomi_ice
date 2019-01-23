@@ -2422,6 +2422,7 @@ struct __sk_buff {
 	/* ... here. */
 
 	__u32 data_meta;
+	__u32 gso_segs;
 };
 
 struct bpf_tunnel_key {
