@@ -2429,6 +2429,7 @@ struct __sk_buff {
 	__u64 tstamp;
 	__u32 wire_len;
 	__u32 gso_segs;
+	__u32 gso_size;
 };
 
 struct bpf_tunnel_key {
