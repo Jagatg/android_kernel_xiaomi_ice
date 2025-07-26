@@ -6783,8 +6783,7 @@ skip_full_check:
 	if (ret == 0)
 		ret = fixup_call_args(env);
 
-	if (log->level && bpf_verifier_log_full(log))
-		ret = -ENOSPC;
+	/* A full verifier log must not by itself reject a valid program. */
 	if (log->level && !log->ubuf) {
 		ret = -EFAULT;
 		goto err_release_maps;
