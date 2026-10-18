@@ -148,6 +148,12 @@ static struct bpf_map *array_map_alloc(union bpf_attr *attr)
 	return &array->map;
 }
 
+static void *array_map_elem_ptr(struct bpf_array *array, u32 index)
+{
+	return (char *)array + offsetof(struct bpf_array, value) +
+	       (size_t)array->elem_size * (index & array->index_mask);
+}
+
 /* Called from syscall or from eBPF program */
 static void *array_map_lookup_elem(struct bpf_map *map, void *key)
 {
@@ -157,7 +163,7 @@ static void *array_map_lookup_elem(struct bpf_map *map, void *key)
 	if (unlikely(index >= array->map.max_entries))
 		return NULL;
 
-	return array->value + array->elem_size * (index & array->index_mask);
+	return array_map_elem_ptr(array, index);
 }
 
 /* emit BPF instructions equivalent to C code of array_map_lookup_elem() */
@@ -269,15 +275,8 @@ static int array_map_update_elem(struct bpf_map *map, void *key, void *value,
 	if (array->map.map_type == BPF_MAP_TYPE_PERCPU_ARRAY)
 		memcpy(this_cpu_ptr(array->pptrs[index & array->index_mask]),
 		       value, map->value_size);
-	else {
-		if (unlikely(sizeof(array->value) <
-			array->elem_size * (index & array->index_mask)))
-			return -EINVAL;
-
-		memcpy(array->value +
-		       array->elem_size * (index & array->index_mask),
-		       value, map->value_size);
-	}
+	else
+		memcpy(array_map_elem_ptr(array, index), value, map->value_size);
 	return 0;
 }
 
