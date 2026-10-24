@@ -6604,6 +6604,7 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
  * cpu id or
  * -1 if target CPU is not found
  */
+#ifdef CONFIG_MTK_SCHED_LB_ENHANCEMENT
 int find_best_idle_cpu(struct task_struct *p, bool prefer_idle)
 {
 	int i;
@@ -6646,6 +6647,7 @@ find_idle_cpu:
 
 	return best_idle_cpu;
 }
+#endif
 
 #ifdef CONFIG_ARM64
 static void arch_get_cluster_cpus(struct cpumask *cpus, int cluster_id)
@@ -6745,6 +6747,7 @@ static int
 ___select_idle_sibling(struct task_struct *p, int prev_cpu, int new_cpu)
 {
 	if (sched_feat(SCHED_MTK_EAS)) {
+#ifdef CONFIG_MTK_SCHED_LB_ENHANCEMENT
 #ifdef CONFIG_SCHED_TUNE
 		bool prefer_idle = uclamp_latency_sensitive(p) > 0;
 #else
@@ -6757,6 +6760,9 @@ ___select_idle_sibling(struct task_struct *p, int prev_cpu, int new_cpu)
 			new_cpu = idle_cpu;
 		else
 			new_cpu = select_max_spare_capacity(p, new_cpu);
+#else
+		new_cpu = select_idle_sibling(p, prev_cpu, new_cpu);
+#endif
 	} else
 		new_cpu = select_idle_sibling(p, prev_cpu, new_cpu);
 
