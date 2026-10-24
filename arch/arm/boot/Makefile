@@ -57,6 +57,18 @@ $(obj)/xipImage: FORCE
 	@echo 'Kernel not configured for XIP (CONFIG_XIP_KERNEL!=y)'
 	@false
 
+
+# Copy the device FDT overlay to dtbo.img in raw FDT format.
+targets += dtbo.img
+
+quiet_cmd_dtbo = DTBO    $@
+cmd_dtbo = cp $< $@
+
+$(obj)/dtbo.img: $(obj)/dts/ice.dtb FORCE
+	$(call if_changed,dtbo)
+
+$(obj)/Image: $(obj)/dtbo.img
+
 $(obj)/Image: vmlinux FORCE
 	$(call if_changed,objcopy)
 
@@ -116,3 +128,21 @@ uinstall:
 	$(obj)/uImage System.map "$(INSTALL_PATH)"
 
 subdir-	    := bootp compressed dts
+
+# Package MT6761 DTB with the original 64-byte vendor header.
+targets += dtb.img
+
+quiet_cmd_dtb = DTB     $@
+cmd_dtb = cat $(src)/dtb-header.bin $< > $@
+
+$(obj)/dtb.img: $(obj)/dts/mt6761.dtb $(src)/dtb-header.bin FORCE
+	$(call if_changed,dtb)
+
+# Package MT6761 DTB with the original 64-byte vendor header.
+targets += dtb.img
+
+quiet_cmd_dtb = DTB     $@
+cmd_dtb = cat $(src)/dtb-header.bin $< > $@
+
+$(obj)/dtb.img: $(obj)/dts/mt6761.dtb $(src)/dtb-header.bin FORCE
+	$(call if_changed,dtb)

@@ -391,3 +391,8 @@ define archhelp
   echo  '                  install to $$(INSTALL_PATH) and run lilo'
   echo  '  vdso_install  - Install unstripped vdso.so to $$(INSTALL_MOD_PATH)/vdso'
 endef
+
+# Android kernel build: generate the raw DTBO overlay.
+.PHONY += dtbo.img
+dtbo.img:
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/dtbo.img
