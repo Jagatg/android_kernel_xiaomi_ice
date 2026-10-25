@@ -127,6 +127,8 @@ enum bpf_map_type {
 	BPF_MAP_TYPE_SOCKHASH,
 	BPF_MAP_TYPE_CGROUP_STORAGE,
 	BPF_MAP_TYPE_REUSEPORT_SOCKARRAY,
+	BPF_MAP_TYPE_DEVMAP_HASH = 25,
+	BPF_MAP_TYPE_RINGBUF = 27,
 };
 
 enum bpf_prog_type {
@@ -152,6 +154,7 @@ enum bpf_prog_type {
 	BPF_PROG_TYPE_LWT_SEG6LOCAL,
 	BPF_PROG_TYPE_LIRC_MODE2,
 	BPF_PROG_TYPE_SK_REUSEPORT,
+	BPF_PROG_TYPE_CGROUP_SOCKOPT = 25,
 };
 
 enum bpf_attach_type {
@@ -172,6 +175,11 @@ enum bpf_attach_type {
 	BPF_CGROUP_UDP4_SENDMSG,
 	BPF_CGROUP_UDP6_SENDMSG,
 	BPF_LIRC_MODE2,
+	BPF_CGROUP_UDP4_RECVMSG = 19,
+	BPF_CGROUP_UDP6_RECVMSG,
+	BPF_CGROUP_GETSOCKOPT = 21,
+	BPF_CGROUP_SETSOCKOPT = 22,
+	BPF_CGROUP_INET_SOCK_RELEASE = 34,
 	__MAX_BPF_ATTACH_TYPE
 };
 
@@ -259,6 +267,7 @@ enum bpf_attach_type {
 /* Flags for accessing BPF object */
 #define BPF_F_RDONLY		(1U << 3)
 #define BPF_F_WRONLY		(1U << 4)
+#define BPF_F_RDONLY_PROG	(1U << 7)
 
 /* Flag for stack_map, store build_id+offset instead of pointer */
 #define BPF_F_STACK_BUILD_ID	(1U << 5)
@@ -2278,7 +2287,16 @@ union bpf_attr {
 	FN(get_netns_cookie),		\
 	FN(get_current_ancestor_cgroup_id),	\
 	FN(sk_assign),			\
-	FN(ktime_get_boot_ns),
+	FN(ktime_get_boot_ns),		\
+	FN(seq_printf),			\
+	FN(seq_write),			\
+	FN(sk_cgroup_id),		\
+	FN(sk_ancestor_cgroup_id),	\
+	FN(ringbuf_output),		\
+	FN(ringbuf_reserve),		\
+	FN(ringbuf_submit),		\
+	FN(ringbuf_discard),		\
+	FN(ringbuf_query),
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call
@@ -2333,6 +2351,25 @@ enum bpf_func_id {
 #define BPF_F_CURRENT_CPU		BPF_F_INDEX_MASK
 /* BPF_FUNC_perf_event_output for sk_buff input context. */
 #define BPF_F_CTXLEN_MASK		(0xfffffULL << 32)
+
+/* BPF ring buffer helper flags and query selectors. */
+enum {
+	BPF_RB_NO_WAKEUP	= (1ULL << 0),
+	BPF_RB_FORCE_WAKEUP	= (1ULL << 1),
+};
+
+enum {
+	BPF_RB_AVAIL_DATA,
+	BPF_RB_RING_SIZE,
+	BPF_RB_CONS_POS,
+	BPF_RB_PROD_POS,
+};
+
+enum {
+	BPF_RINGBUF_BUSY_BIT	= (1U << 31),
+	BPF_RINGBUF_DISCARD_BIT	= (1U << 30),
+	BPF_RINGBUF_HDR_SZ	= 8,
+};
 
 /* Mode for BPF_FUNC_skb_adjust_room helper. */
 enum bpf_adj_room_mode {
@@ -2643,6 +2680,16 @@ struct bpf_sock_ops {
 	__u32 sk_txhash;
 	__u64 bytes_received;
 	__u64 bytes_acked;
+};
+
+struct bpf_sockopt {
+	__aligned_u64 sk;
+	__aligned_u64 optval;
+	__aligned_u64 optval_end;
+	__s32 level;
+	__s32 optname;
+	__s32 optlen;
+	__s32 retval;
 };
 
 /* Definitions for bpf_sock_ops_cb_flags */

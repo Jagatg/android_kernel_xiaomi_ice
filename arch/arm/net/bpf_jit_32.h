@@ -86,6 +86,10 @@
 #define ARM_INST_LDRH_R		0x019000b0
 #define ARM_INST_LDR_I		0x05100000
 #define ARM_INST_LDR_R		0x07900000
+#define ARM_INST_LDREX		0x01900f9f
+#define ARM_INST_LDREXD		0x01b00f9f
+#define ARM_INST_STREX		0x01800f90
+#define ARM_INST_STREXD		0x01a00f90
 
 #define ARM_INST_LDM		0x08900000
 #define ARM_INST_LDM_IA		0x08b00000
@@ -190,6 +194,10 @@
 #define ARM_LDR_R(rt, rn, rm)	(ARM_INST_LDR_R | ARM_INST_LDST__U \
 				 | (rt) << 12 | (rn) << 16 \
 				 | (rm))
+#define ARM_LDREX(rt, rn)	(ARM_INST_LDREX | (rn) << 16 | (rt) << 12)
+#define ARM_LDREXD(rt, rn)	(ARM_INST_LDREXD | (rn) << 16 | (rt) << 12)
+#define ARM_STREX(rd, rn, rm)	(ARM_INST_STREX | (rn) << 16 | (rd) << 12 | (rm))
+#define ARM_STREXD(rd, rn, rt)	(ARM_INST_STREXD | (rn) << 16 | (rd) << 12 | (rt))
 #define ARM_LDR_R_SI(rt, rn, rm, type, imm) \
 				(ARM_INST_LDR_R | ARM_INST_LDST__U \
 				 | (rt) << 12 | (rn) << 16 \

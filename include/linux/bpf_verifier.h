@@ -51,6 +51,9 @@ struct bpf_reg_state {
 		 */
 		struct bpf_map *map_ptr;
 
+		/* valid for PTR_TO_MEM and PTR_TO_MEM_OR_NULL */
+		u32 mem_size;
+
 		/* Max size from any of the above. */
 		unsigned long raw;
 	};
@@ -58,8 +61,8 @@ struct bpf_reg_state {
 	s32 off;
 	/* For PTR_TO_PACKET, used to find other pointers with the same variable
 	 * offset, so they can share range knowledge.
-	 * For PTR_TO_MAP_VALUE_OR_NULL this is used to share which map value we
-	 * came from, when one is tested for != NULL.
+	 * For nullable map and allocated-memory pointers, this identifies aliases
+	 * that must be refined together after a null check.
 	 */
 	u32 id;
 	/* Ordering of fields matters.  See states_equal() */
@@ -105,6 +108,11 @@ struct bpf_stack_state {
 	u8 slot_type[BPF_REG_SIZE];
 };
 
+struct bpf_reference_state {
+	int id;
+	int insn_idx;
+};
+
 /* state of the program:
  * type of all registers and stack info
  */
@@ -123,7 +131,9 @@ struct bpf_func_state {
 	 */
 	u32 subprogno;
 
-	/* should be second to last. See copy_func_state() */
+	int acquired_refs;
+	struct bpf_reference_state *refs;
+	/* These fields should be last. See copy_func_state(). */
 	int allocated_stack;
 	struct bpf_stack_state *stack;
 };

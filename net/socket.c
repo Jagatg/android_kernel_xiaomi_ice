@@ -90,6 +90,7 @@
 #include <linux/slab.h>
 #include <linux/xattr.h>
 #include <linux/nospec.h>
+#include <linux/bpf-cgroup.h>
 
 #include <linux/uaccess.h>
 #include <asm/unistd.h>
@@ -1880,6 +1881,8 @@ SYSCALL_DEFINE4(recv, int, fd, void __user *, ubuf, size_t, size,
 static int __sys_setsockopt(int fd, int level, int optname,
 			    char __user *optval, int optlen)
 {
+	char *kernel_optval = NULL;
+	mm_segment_t oldfs;
 	int err, fput_needed;
 	struct socket *sock;
 
@@ -1892,6 +1895,22 @@ static int __sys_setsockopt(int fd, int level, int optname,
 		if (err)
 			goto out_put;
 
+		err = BPF_CGROUP_RUN_PROG_SETSOCKOPT(sock->sk, &level, &optname,
+						     optval, &optlen,
+						     &kernel_optval);
+		if (err < 0)
+			goto out_put;
+		if (err > 0) {
+			err = 0;
+			goto out_put;
+		}
+
+		if (kernel_optval) {
+			oldfs = get_fs();
+			set_fs(KERNEL_DS);
+			optval = (char __user __force *)kernel_optval;
+		}
+
 		if (level == SOL_SOCKET)
 			err =
 			    sock_setsockopt(sock, level, optname, optval,
@@ -1900,7 +1919,13 @@ static int __sys_setsockopt(int fd, int level, int optname,
 			err =
 			    sock->ops->setsockopt(sock, level, optname, optval,
 						  optlen);
+		if (kernel_optval) {
+			set_fs(oldfs);
+			kfree(kernel_optval);
+			kernel_optval = NULL;
+		}
 out_put:
+		kfree(kernel_optval);
 		fput_light(sock->file, fput_needed);
 	}
 	return err;
@@ -1921,6 +1946,7 @@ static int __sys_getsockopt(int fd, int level, int optname,
 			    char __user *optval, int __user *optlen)
 {
 	int err, fput_needed;
+	int max_optlen;
 	struct socket *sock;
 
 	sock = sockfd_lookup_light(fd, &err, &fput_needed);
@@ -1928,6 +1954,13 @@ static int __sys_getsockopt(int fd, int level, int optname,
 		err = security_socket_getsockopt(sock, level, optname);
 		if (err)
 			goto out_put;
+
+		if (cgroup_bpf_enabled && get_user(max_optlen, optlen)) {
+			err = -EFAULT;
+			goto out_put;
+		}
+		if (!cgroup_bpf_enabled)
+			max_optlen = 0;
 
 		if (level == SOL_SOCKET)
 			err =
@@ -1937,6 +1970,9 @@ static int __sys_getsockopt(int fd, int level, int optname,
 			err =
 			    sock->ops->getsockopt(sock, level, optname, optval,
 						  optlen);
+		err = BPF_CGROUP_RUN_PROG_GETSOCKOPT(sock->sk, level, optname,
+						     optval, optlen, max_optlen,
+						     err);
 out_put:
 		fput_light(sock->file, fput_needed);
 	}
