@@ -143,6 +143,8 @@ struct bpf_verifier_state {
 	/* call stack tracking */
 	struct bpf_func_state *frame[MAX_CALL_FRAMES];
 	struct bpf_verifier_state *parent;
+	/* Number of paths from this state that are still being explored. */
+	u32 branches;
 	u32 curframe;
 	bool speculative;
 };
@@ -225,6 +227,8 @@ struct bpf_verifier_env {
 	struct bpf_verifier_log log;
 	struct bpf_subprog_info subprog_info[BPF_MAX_SUBPROGS + 1];
 	u32 subprog_cnt;
+	u32 prev_insn_processed, insn_processed;
+	u32 prev_jmps_processed, jmps_processed;
 };
 
 __printf(2, 0) void bpf_verifier_vlog(struct bpf_verifier_log *log,
