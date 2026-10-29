@@ -38,6 +38,13 @@ config XZ_DEC_SPARC
 	default y
 	select XZ_DEC_BCJ
 
+config XZ_DEC_MICROLZMA
+	bool "MicroLZMA decoder"
+	default n
+	help
+	  Enable support for raw MicroLZMA streams. This is used by EROFS
+	  compressed filesystems.
+
 endif
 
 config XZ_DEC_BCJ

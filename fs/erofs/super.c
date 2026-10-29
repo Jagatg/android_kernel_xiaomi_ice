@@ -228,6 +228,11 @@ static int erofs_load_compr_cfgs(struct super_block *sb,
 		case Z_EROFS_COMPRESSION_LZ4:
 			ret = z_erofs_load_lz4_config(sb, dsb, data, size);
 			break;
+#ifdef CONFIG_EROFS_FS_ZIP_LZMA
+		case Z_EROFS_COMPRESSION_LZMA:
+			ret = z_erofs_load_lzma_config(sb, dsb, data, size);
+			break;
+#endif
 		default:
 			DBG_BUGON(1);
 			ret = -EFAULT;
@@ -673,6 +678,12 @@ static int __init erofs_module_init(void)
 	if (err)
 		goto zip_err;
 
+#ifdef CONFIG_EROFS_FS_ZIP_LZMA
+	err = z_erofs_lzma_init();
+	if (err)
+		goto lzma_err;
+#endif
+
 	err = register_filesystem(&erofs_fs_type);
 	if (err)
 		goto fs_err;
@@ -680,6 +691,10 @@ static int __init erofs_module_init(void)
 	return 0;
 
 fs_err:
+#ifdef CONFIG_EROFS_FS_ZIP_LZMA
+	z_erofs_lzma_exit();
+lzma_err:
+#endif
 	z_erofs_exit_zip_subsystem();
 zip_err:
 	erofs_exit_shrinker();
@@ -692,6 +707,9 @@ icache_err:
 static void __exit erofs_module_exit(void)
 {
 	unregister_filesystem(&erofs_fs_type);
+#ifdef CONFIG_EROFS_FS_ZIP_LZMA
+	z_erofs_lzma_exit();
+#endif
 	z_erofs_exit_zip_subsystem();
 	erofs_exit_shrinker();
 

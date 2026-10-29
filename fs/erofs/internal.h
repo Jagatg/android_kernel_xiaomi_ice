@@ -434,6 +434,13 @@ int __init erofs_init_shrinker(void);
 void erofs_exit_shrinker(void);
 int __init z_erofs_init_zip_subsystem(void);
 void z_erofs_exit_zip_subsystem(void);
+#ifdef CONFIG_EROFS_FS_ZIP_LZMA
+int z_erofs_lzma_init(void);
+void z_erofs_lzma_exit(void);
+int z_erofs_load_lzma_config(struct super_block *sb,
+			     struct erofs_super_block *dsb,
+			     struct z_erofs_lzma_cfgs *lzma, int size);
+#endif
 int erofs_try_to_free_all_cached_pages(struct erofs_sb_info *sbi,
 				       struct erofs_workgroup *egrp);
 int erofs_try_to_free_cached_page(struct address_space *mapping,
