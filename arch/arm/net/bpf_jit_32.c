@@ -1,7 +1,6 @@
 /*
  * Just-In-Time compiler for eBPF filters on 32bit ARM
  *
- * Copyright (c) 2023 Puranjay Mohan <puranjay12@gmail.com>
  * Copyright (c) 2017 Shubham Bansal <illusionist.neo@gmail.com>
  * Copyright (c) 2011 Mircea Gherzan <mgherzan@gmail.com>
  *
@@ -19,7 +18,6 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/if_vlan.h>
-#include <linux/math64.h>
 
 #include <asm/cacheflush.h>
 #include <asm/hwcap.h>
@@ -41,6 +39,10 @@
  *                        +-----+
  *                        |RSVD | JIT scratchpad
  * current ARM_SP =>      +-----+ <= (BPF_FP - STACK_SIZE + SCRATCH_SIZE)
+ *                        | ... | caller-saved registers
+ *                        +-----+
+ *                        | ... | arguments passed on stack
+ * ARM_SP during call =>  +-----|
  *                        |     |
  *                        | ... | Function call stack
  *                        |     |
@@ -68,6 +70,12 @@
  *
  * When popping registers off the stack at the end of a BPF function, we
  * reference them via the current ARM_FP register.
+ *
+ * Some eBPF operations are implemented via a call to a helper function.
+ * Such calls are "invisible" in the eBPF code, so it is up to the calling
+ * program to preserve any caller-saved ARM registers during the call. The
+ * JIT emits code to push and pop those registers onto the stack, immediately
+ * above the callee stack frame.
  */
 #define CALLEE_MASK	(1 << ARM_R4 | 1 << ARM_R5 | 1 << ARM_R6 | \
 			 1 << ARM_R7 | 1 << ARM_R8 | 1 << ARM_R9 | \
@@ -221,19 +229,6 @@ static u32 jit_udiv32(u32 dividend, u32 divisor)
 static u32 jit_mod32(u32 dividend, u32 divisor)
 {
 	return dividend % divisor;
-}
-
-static u64 jit_udiv64(u64 dividend, u64 divisor)
-{
-	return div64_u64(dividend, divisor);
-}
-
-static u64 jit_mod64(u64 dividend, u64 divisor)
-{
-	u64 rem;
-
-	div64_u64_rem(dividend, divisor, &rem);
-	return rem;
 }
 
 static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
@@ -482,8 +477,7 @@ static inline int epilogue_offset(const struct jit_ctx *ctx)
 	return to - from - 2;
 }
 
-static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx,
-				u8 op)
+static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op)
 {
 	const int exclude_mask = BIT(ARM_R0) | BIT(ARM_R1);
 	const s8 *tmp = bpf2a32[TMP_REG_1];
@@ -517,6 +511,7 @@ static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx,
 		emit(ARM_MOV_R(ARM_R0, rm), ctx);
 	}
 
+	/* Push caller-saved registers on stack */
 	emit(ARM_PUSH(CALLER_MASK & ~exclude_mask), ctx);
 
 	/* Call appropriate function */
@@ -524,6 +519,7 @@ static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx,
 		   (u32)jit_udiv32 : (u32)jit_mod32, ctx);
 	emit_blx_r(ARM_IP, ctx);
 
+	/* Restore caller-saved registers from stack */
 	emit(ARM_POP(CALLER_MASK & ~exclude_mask), ctx);
 
 	/* Save return value */
@@ -535,50 +531,6 @@ static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx,
 		emit(ARM_MOV_R(ARM_R1, tmp[0]), ctx);
 	if (rm != ARM_R0)
 		emit(ARM_MOV_R(ARM_R0, tmp[1]), ctx);
-}
-
-static inline void emit_udivmod64(const s8 *rd, const s8 *rm,
-				  const s8 *rn, struct jit_ctx *ctx,
-				  u8 op)
-{
-	emit(ARM_PUSH(CALLER_MASK), ctx);
-
-	if (rm[1] != ARM_R0 || rn[1] != ARM_R2) {
-		if (rm[1] != ARM_R0) {
-			if (rn[1] == ARM_R0)
-				emit(ARM_PUSH(BIT(ARM_R0) | BIT(ARM_R1)), ctx);
-			emit(ARM_MOV_R(ARM_R1, rm[0]), ctx);
-			emit(ARM_MOV_R(ARM_R0, rm[1]), ctx);
-			if (rn[1] == ARM_R0) {
-				emit(ARM_POP(BIT(ARM_R2) | BIT(ARM_R3)), ctx);
-				goto call;
-			}
-		}
-		if (rn[1] != ARM_R2) {
-			emit(ARM_MOV_R(ARM_R3, rn[0]), ctx);
-			emit(ARM_MOV_R(ARM_R2, rn[1]), ctx);
-		}
-	}
-
-call:
-	emit_mov_i(ARM_IP, op == BPF_DIV ?
-		   (u32)jit_udiv64 : (u32)jit_mod64, ctx);
-	emit_blx_r(ARM_IP, ctx);
-
-	if (rd[1] != ARM_R0) {
-		emit(ARM_MOV_R(rd[0], ARM_R1), ctx);
-		emit(ARM_MOV_R(rd[1], ARM_R0), ctx);
-	}
-
-	if (rd[1] != ARM_R0 && rd[1] != ARM_R2) {
-		emit(ARM_POP(CALLER_MASK), ctx);
-	} else if (rd[1] != ARM_R0) {
-		emit(ARM_POP(BIT(ARM_R0) | BIT(ARM_R1)), ctx);
-		emit(ARM_ADD_I(ARM_SP, ARM_SP, 8), ctx);
-	} else {
-		emit(ARM_ADD_I(ARM_SP, ARM_SP, 8), ctx);
-		emit(ARM_POP(BIT(ARM_R2) | BIT(ARM_R3)), ctx);
-	}
 }
 
 /* Is the translated BPF register on stack? */
@@ -1515,19 +1467,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	case BPF_ALU64 | BPF_DIV | BPF_X:
 	case BPF_ALU64 | BPF_MOD | BPF_K:
 	case BPF_ALU64 | BPF_MOD | BPF_X:
-		rd = arm_bpf_get_reg64(dst, tmp2, ctx);
-		switch (BPF_SRC(code)) {
-		case BPF_X:
-			rs = arm_bpf_get_reg64(src, tmp, ctx);
-			break;
-		case BPF_K:
-			rs = tmp;
-			emit_a32_mov_se_i64(is64, rs, imm, ctx);
-			break;
-		}
-		emit_udivmod64(rd, rd, rs, ctx, BPF_OP(code));
-		arm_bpf_put_reg64(dst, rd, ctx);
-		break;
+		goto notyet;
 	/* dst = dst >> imm */
 	/* dst = dst << imm */
 	case BPF_ALU | BPF_RSH | BPF_K:
@@ -1657,6 +1597,9 @@ exit:
 		rn = arm_bpf_get_reg32(src_lo, tmp2[1], ctx);
 		emit_ldx_r(dst, rn, off, ctx, BPF_SIZE(code));
 		break;
+	/* speculation barrier */
+	case BPF_ST | BPF_NOSPEC:
+		break;
 	/* ST: *(size *)(dst + off) = imm */
 	case BPF_ST | BPF_MEM | BPF_W:
 	case BPF_ST | BPF_MEM | BPF_H:
@@ -1677,62 +1620,9 @@ exit:
 		break;
 	/* STX XADD: lock *(u32 *)(dst + off) += src */
 	case BPF_STX | BPF_XADD | BPF_W:
-	{
-#if __LINUX_ARM_ARCH__ >= 6
-		int retry_idx, branch_offset;
-		s8 old = tmp[1];
-		s8 new = tmp[0];
-		s8 status = tmp2[1];
-
-		rn = arm_bpf_get_reg32(dst_lo, tmp2[1], ctx);
-		rm = arm_bpf_get_reg32(src_lo, tmp2[0], ctx);
-		if (off) {
-			emit_a32_mov_i(ARM_IP, off, ctx);
-			emit(ARM_ADD_R(ARM_IP, rn, ARM_IP), ctx);
-		} else {
-			emit(ARM_MOV_R(ARM_IP, rn), ctx);
-		}
-
-		retry_idx = ctx->idx;
-		emit(ARM_LDREX(old, ARM_IP), ctx);
-		emit(ARM_ADD_R(new, old, rm), ctx);
-		emit(ARM_STREX(status, ARM_IP, new), ctx);
-		emit(ARM_CMP_I(status, 0), ctx);
-		branch_offset = retry_idx - (int)ctx->idx - 2;
-		_emit(ARM_COND_NE, ARM_B(branch_offset), ctx);
-		break;
-#else
-		goto notyet;
-#endif
-	}
 	/* STX XADD: lock *(u64 *)(dst + off) += src */
 	case BPF_STX | BPF_XADD | BPF_DW:
-	{
-#if __LINUX_ARM_ARCH__ >= 7
-		int retry_idx, branch_offset;
-
-		rn = arm_bpf_get_reg32(dst_lo, tmp2[1], ctx);
-		if (off) {
-			emit_a32_mov_i(ARM_IP, off, ctx);
-			emit(ARM_ADD_R(ARM_IP, rn, ARM_IP), ctx);
-		} else {
-			emit(ARM_MOV_R(ARM_IP, rn), ctx);
-		}
-
-		rs = arm_bpf_get_reg64(src, tmp2, ctx);
-		retry_idx = ctx->idx;
-		emit(ARM_LDREXD(tmp[1], ARM_IP), ctx);
-		emit(ARM_ADDS_R(tmp[1], tmp[1], rs[1]), ctx);
-		emit(ARM_ADC_R(tmp[0], tmp[0], rs[0]), ctx);
-		emit(ARM_STREXD(ARM_LR, ARM_IP, tmp[1]), ctx);
-		emit(ARM_CMP_I(ARM_LR, 0), ctx);
-		branch_offset = retry_idx - (int)ctx->idx - 2;
-		_emit(ARM_COND_NE, ARM_B(branch_offset), ctx);
-		break;
-#else
 		goto notyet;
-#endif
-	}
 	/* STX: *(size *)(dst + off) = src */
 	case BPF_STX | BPF_MEM | BPF_W:
 	case BPF_STX | BPF_MEM | BPF_H:
@@ -2100,3 +1990,4 @@ out:
 					   tmp : orig_prog);
 	return prog;
 }
+

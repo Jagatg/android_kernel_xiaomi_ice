@@ -156,8 +156,7 @@ static inline void ccci_md_inc_tx_seq_num(unsigned char md_id,
 	struct ccci_hif_traffic *traffic_info,
 	struct ccci_header *ccci_h)
 {
-	if (ccci_h->channel >= ARRAY_SIZE(traffic_info->seq_nums[OUT])
-		|| ccci_h->channel < 0) {
+	if (ccci_h->channel >= ARRAY_SIZE(traffic_info->seq_nums[OUT])) {
 		CCCI_NORMAL_LOG(md_id, CORE,
 			"ignore seq inc on channel %x\n",
 			*(((u32 *) ccci_h) + 2));
@@ -243,4 +242,5 @@ struct dvfs_ref *mtk_ccci_get_dvfs_table(int is_ul, int *tbl_num);
 extern void ccci_hif_register(unsigned char hif_id, void *hif_per_data,
 	struct ccci_hif_ops *ops);
 
+extern void ccmni_set_cur_speed(u64 cur_dl_speed);
 #endif

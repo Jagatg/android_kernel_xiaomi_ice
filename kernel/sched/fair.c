@@ -6022,7 +6022,7 @@ schedtune_margin(unsigned long signal, long boost)
 static inline int
 schedtune_cpu_margin(unsigned long util, int cpu)
 {
-	int boost = schedtune_cpu_boost(cpu);
+	int boost = schedtune_cpu_boost_with(cpu, NULL);
 
 	if (boost == 0)
 		return 0;

@@ -38,11 +38,10 @@
 #include <linux/fdtable.h>
 #include <linux/list_sort.h>
 #include <linux/mount.h>
+#include <linux/pseudo_fs.h>
 
 #include <uapi/linux/dma-buf.h>
 #include <uapi/linux/magic.h>
-
-static inline int is_dma_buf_file(struct file *);
 
 struct dma_buf_list {
 	struct list_head head;
@@ -114,16 +113,20 @@ static const struct dentry_operations dma_buf_dentry_ops = {
 
 static struct vfsmount *dma_buf_mnt;
 
-static struct dentry *dma_buf_fs_mount(struct file_system_type *fs_type,
-		int flags, const char *name, void *data)
+static int dma_buf_fs_init_context(struct fs_context *fc)
 {
-	return mount_pseudo(fs_type, "dmabuf:", NULL, &dma_buf_dentry_ops,
-			DMA_BUF_MAGIC);
+	struct pseudo_fs_context *ctx;
+
+	ctx = init_pseudo(fc, DMA_BUF_MAGIC);
+		if (!ctx)
+			return -ENOMEM;
+	ctx->dops = &dma_buf_dentry_ops;
+	return 0;
 }
 
 static struct file_system_type dma_buf_fs_type = {
 	.name = "dmabuf",
-	.mount = dma_buf_fs_mount,
+	.init_fs_context = dma_buf_fs_init_context,
 	.kill_sb = kill_anon_super,
 };
 
@@ -452,10 +455,11 @@ static const struct file_operations dma_buf_fops = {
 /*
  * is_dma_buf_file - Check if struct file* is associated with dma_buf
  */
-static inline int is_dma_buf_file(struct file *file)
+int is_dma_buf_file(struct file *file)
 {
 	return file->f_op == &dma_buf_fops;
 }
+EXPORT_SYMBOL_GPL(is_dma_buf_file);
 
 static struct file *dma_buf_getfile(struct dma_buf *dmabuf, int flags)
 {

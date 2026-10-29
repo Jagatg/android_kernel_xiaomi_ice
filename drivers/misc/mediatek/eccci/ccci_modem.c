@@ -1389,8 +1389,8 @@ EXPORT_SYMBOL(ccci_md_get_smem_by_user_id);
 
 void ccci_md_clear_smem(int md_id, int first_boot)
 {
-	struct ccci_smem_region *region;
-	unsigned int size;
+	struct ccci_smem_region *region = NULL;
+	unsigned int size = 0;
 
 	if (md_id < 0 || md_id >= MAX_MD_NUM) {
 		CCCI_ERROR_LOG(md_id, TAG, "invalid md_id %d!!\n", md_id);
@@ -2706,6 +2706,7 @@ int exec_ccci_kern_func_by_md_id(int md_id, unsigned int id, char *buf,
 		break;
 	case MD_DISPLAY_DYNAMIC_MIPI:
 		tmp_data = 0;
+		len = (len < sizeof(tmp_data)) ? len : sizeof(tmp_data);
 		memcpy((void *)&tmp_data, buf, len);
 		ret = ccci_port_send_msg_to_md(md_id, CCCI_SYSTEM_TX,
 			id, tmp_data, 0);

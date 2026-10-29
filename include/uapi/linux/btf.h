@@ -35,7 +35,8 @@ struct btf_type {
 	 * bits 16-23: unused
 	 * bits 24-27: kind (e.g. int, ptr, array...etc)
 	 * bits 28-30: unused
-	 * bit     31: kind_flag
+	 * bit     31: kind_flag, currently used by
+	 *             struct, union and fwd
 	 */
 	__u32 info;
 	/* "size" is used by INT, ENUM, STRUCT, UNION and DATASEC.
@@ -114,13 +115,19 @@ struct btf_array {
 struct btf_member {
 	__u32	name_off;
 	__u32	type;
-	/* If the type info kind_flag is set, offset encodes bitfield size
-	 * and bit offset. Otherwise, it contains only the bit offset.
+	/* If the type info kind_flag is set, the btf_member offset
+	 * contains both member bitfield size and bit offset. The
+	 * bitfield size is set for bitfield members. If the type
+	 * info kind_flag is not set, the offset contains only bit
+	 * offset.
 	 */
 	__u32	offset;
 };
 
-/* Accessors for struct/union member offsets when kind_flag is set. */
+/* If the struct/union type info kind_flag is set, the
+ * following two macros are used to access bitfield_size
+ * and bit_offset from btf_member.offset.
+ */
 #define BTF_MEMBER_BITFIELD_SIZE(val)	((val) >> 24)
 #define BTF_MEMBER_BIT_OFFSET(val)	((val) & 0xffffff)
 
@@ -133,15 +140,15 @@ struct btf_param {
 	__u32	type;
 };
 
+enum {
+	BTF_VAR_STATIC = 0,
+	BTF_VAR_GLOBAL_ALLOCATED,
+};
+
 enum btf_func_linkage {
 	BTF_FUNC_STATIC = 0,
 	BTF_FUNC_GLOBAL = 1,
 	BTF_FUNC_EXTERN = 2,
-};
-
-enum {
-	BTF_VAR_STATIC = 0,
-	BTF_VAR_GLOBAL_ALLOCATED,
 };
 
 /* BTF_KIND_VAR is followed by a single "struct btf_var" to describe
@@ -152,7 +159,7 @@ struct btf_var {
 };
 
 /* BTF_KIND_DATASEC is followed by multiple "struct btf_var_secinfo"
- * to describe all BTF_KIND_VAR types it contains along with its
+ * to describe all BTF_KIND_VAR types it contains along with it's
  * in-section offset as well as size.
  */
 struct btf_var_secinfo {
