@@ -1383,7 +1383,7 @@ bpf_prog_load_check_attach_type(enum bpf_prog_type prog_type,
 }
 
 /* last field in 'union bpf_attr' used by this command */
-#define	BPF_PROG_LOAD_LAST_FIELD expected_attach_type
+#define	BPF_PROG_LOAD_LAST_FIELD prog_token_fd
 
 static int bpf_prog_load(union bpf_attr *attr)
 {
@@ -1394,6 +1394,14 @@ static int bpf_prog_load(union bpf_attr *attr)
 	bool is_gpl;
 
 	if (CHECK_ATTR(BPF_PROG_LOAD))
+		return -EINVAL;
+
+	/* BTF and line information are optional metadata this verifier does not
+	 * retain. Reject newer load features that require unsupported semantics.
+	 */
+	if (attr->attach_btf_id || attr->attach_prog_fd || attr->fd_array ||
+	    attr->core_relo_cnt || attr->core_relos ||
+	    attr->core_relo_rec_size || attr->prog_token_fd)
 		return -EINVAL;
 
 	if (attr->prog_flags & ~BPF_F_STRICT_ALIGNMENT)

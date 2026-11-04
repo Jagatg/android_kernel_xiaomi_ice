@@ -340,6 +340,24 @@ union bpf_attr {
 		 * (context accesses, allowed helpers, etc).
 		 */
 		__u32		expected_attach_type;
+		__u32		prog_btf_fd;	/* fd pointing to BTF type data */
+		__u32		func_info_rec_size;
+		__aligned_u64	func_info;
+		__u32		func_info_cnt;
+		__u32		line_info_rec_size;
+		__aligned_u64	line_info;
+		__u32		line_info_cnt;
+		__u32		attach_btf_id;
+		union {
+			__u32		attach_prog_fd;
+			__u32		attach_btf_obj_fd;
+		};
+		__u32		core_relo_cnt;
+		__aligned_u64	fd_array;
+		__aligned_u64	core_relos;
+		__u32		core_relo_rec_size;
+		__u32		log_true_size;
+		__s32		prog_token_fd;
 	};
 
 	struct { /* anonymous struct used by BPF_OBJ_* commands */
