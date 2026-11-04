@@ -7,6 +7,7 @@
 #include <linux/spinlock.h>
 #include <linux/bpf.h>
 #include <net/bpf_sk_storage.h>
+#include <net/inet_sock.h>
 #include <net/sock.h>
 #include <uapi/linux/btf.h>
 
@@ -719,6 +720,10 @@ BPF_CALL_4(bpf_sk_storage_get, struct bpf_map *, map, struct sock *, sk,
 {
 	struct bpf_sk_storage_data *sdata;
 
+	sk = sk_to_full_sk(sk);
+	if (!sk || !sk_fullsock(sk))
+		return (unsigned long)NULL;
+
 	if (flags > BPF_SK_STORAGE_GET_F_CREATE)
 		return (unsigned long)NULL;
 
@@ -734,9 +739,7 @@ BPF_CALL_4(bpf_sk_storage_get, struct bpf_map *, map, struct sock *, sk,
 	     */
 	    refcount_inc_not_zero(&sk->sk_refcnt)) {
 		sdata = sk_storage_update(sk, map, value, BPF_NOEXIST);
-		/* sk must be a fullsock (guaranteed by verifier),
-		 * so sock_gen_put() is unnecessary.
-		 */
+		/* sk is a fullsock, so sock_gen_put() is unnecessary. */
 		sock_put(sk);
 		return IS_ERR(sdata) ?
 			(unsigned long)NULL : (unsigned long)sdata->data;
@@ -747,6 +750,10 @@ BPF_CALL_4(bpf_sk_storage_get, struct bpf_map *, map, struct sock *, sk,
 
 BPF_CALL_2(bpf_sk_storage_delete, struct bpf_map *, map, struct sock *, sk)
 {
+	sk = sk_to_full_sk(sk);
+	if (!sk || !sk_fullsock(sk))
+		return -ENOENT;
+
 	if (refcount_inc_not_zero(&sk->sk_refcnt)) {
 		int err;
 
@@ -774,7 +781,7 @@ const struct bpf_func_proto bpf_sk_storage_get_proto = {
 	.gpl_only	= false,
 	.ret_type	= RET_PTR_TO_MAP_VALUE_OR_NULL,
 	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_PTR_TO_SOCKET,
+	.arg2_type	= ARG_PTR_TO_SOCK_COMMON,
 	.arg3_type	= ARG_PTR_TO_MAP_VALUE_OR_NULL,
 	.arg4_type	= ARG_ANYTHING,
 };
@@ -784,5 +791,5 @@ const struct bpf_func_proto bpf_sk_storage_delete_proto = {
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,
 	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_PTR_TO_SOCKET,
+	.arg2_type	= ARG_PTR_TO_SOCK_COMMON,
 };

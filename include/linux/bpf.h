@@ -165,6 +165,7 @@ enum bpf_arg_type {
 	ARG_PTR_TO_ALLOC_MEM,	/* pointer to dynamically allocated memory */
 	ARG_CONST_ALLOC_SIZE_OR_ZERO, /* constant number of allocated bytes */
 	ARG_PTR_TO_SOCKET,	/* pointer to bpf_sock (fullsock) */
+	ARG_PTR_TO_SOCK_COMMON,	/* pointer to sock_common */
 };
 
 /* type of values returned from helper functions */
@@ -174,6 +175,7 @@ enum bpf_return_type {
 	RET_PTR_TO_MAP_VALUE,		/* returns a pointer to map elem value */
 	RET_PTR_TO_MAP_VALUE_OR_NULL,	/* returns a pointer to map elem value or NULL */
 	RET_PTR_TO_ALLOC_MEM_OR_NULL,	/* dynamically allocated memory or NULL */
+	RET_PTR_TO_SOCKET_OR_NULL,	/* returns a pointer to bpf_sock or NULL */
 };
 
 /* eBPF function prototype used by verifier to allow BPF_CALLs from eBPF programs
@@ -227,6 +229,9 @@ enum bpf_reg_type {
 	PTR_TO_MEM,		 /* reg points to a bounded memory region */
 	PTR_TO_MEM_OR_NULL,	 /* bounded memory pointer or NULL */
 	PTR_TO_SOCKET,		 /* reg points to struct bpf_sock */
+	PTR_TO_SOCKET_OR_NULL,	 /* reg points to struct bpf_sock or NULL */
+	PTR_TO_SOCK_COMMON,	 /* reg points to sock_common */
+	PTR_TO_SOCK_COMMON_OR_NULL, /* reg points to sock_common or NULL */
 };
 
 /* The information passed from prog-specific *_is_valid_access
@@ -862,6 +867,9 @@ extern const struct bpf_func_proto bpf_get_local_storage_proto;
 extern const struct bpf_func_proto bpf_tcp_sock_proto;
 
 #if defined(CONFIG_NET)
+bool bpf_sock_common_is_valid_access(int off, int size,
+				     enum bpf_access_type type,
+				     struct bpf_insn_access_aux *info);
 bool bpf_sock_is_valid_access(int off, int size, enum bpf_access_type type,
 			      struct bpf_insn_access_aux *info);
 u32 bpf_sock_convert_ctx_access(enum bpf_access_type type,
@@ -870,6 +878,12 @@ u32 bpf_sock_convert_ctx_access(enum bpf_access_type type,
 				struct bpf_prog *prog,
 				u32 *target_size);
 #else
+static inline bool bpf_sock_common_is_valid_access(int off, int size,
+						   enum bpf_access_type type,
+						   struct bpf_insn_access_aux *info)
+{
+	return false;
+}
 static inline bool bpf_sock_is_valid_access(int off, int size,
 					    enum bpf_access_type type,
 					    struct bpf_insn_access_aux *info)
