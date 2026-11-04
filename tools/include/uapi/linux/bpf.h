@@ -2422,6 +2422,12 @@ struct __sk_buff {
 	/* ... here. */
 
 	__u32 data_meta;
+	union {
+		struct bpf_flow_keys *flow_keys;
+		__u64 :64;
+	} __attribute__((aligned(8)));
+	__u64 tstamp;
+	__u32 wire_len;
 	__u32 gso_segs;
 };
 
