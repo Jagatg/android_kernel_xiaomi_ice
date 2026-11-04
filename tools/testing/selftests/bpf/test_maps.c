@@ -18,6 +18,7 @@
 
 #include <sys/wait.h>
 #include <sys/socket.h>
+#include <sys/mman.h>
 #include <netinet/in.h>
 #include <linux/bpf.h>
 
@@ -357,6 +358,35 @@ static void test_arraymap(int task, void *data)
 	key = 1;
 	assert(bpf_map_delete_elem(fd, &key) == -1 && errno == EINVAL);
 
+	close(fd);
+}
+
+static void test_arraymap_mmap(void)
+{
+	int key = 1, fd;
+	long long value = 1234;
+	long long *values;
+	size_t page_size = sysconf(_SC_PAGE_SIZE);
+
+	fd = bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(key), sizeof(value),
+			    2, BPF_F_MMAPABLE);
+	if (fd < 0) {
+		printf("Failed to create mmapable arraymap '%s'!\n",
+		       strerror(errno));
+		exit(1);
+	}
+
+	assert(bpf_map_update_elem(fd, &key, &value, BPF_ANY) == 0);
+	assert(mmap(NULL, page_size, PROT_READ, MAP_PRIVATE, fd, 0) ==
+	       MAP_FAILED && errno == EINVAL);
+	values = mmap(NULL, page_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+		      fd, 0);
+	assert(values != MAP_FAILED);
+	assert(values[key] == value);
+	values[0] = 5678;
+	key = 0;
+	assert(bpf_map_lookup_elem(fd, &key, &value) == 0 && value == 5678);
+	assert(munmap(values, page_size) == 0);
 	close(fd);
 }
 
@@ -1421,6 +1451,7 @@ static void run_all_tests(void)
 	test_hashmap_walk(0, NULL);
 
 	test_arraymap(0, NULL);
+	test_arraymap_mmap();
 	test_arraymap_percpu(0, NULL);
 
 	test_arraymap_percpu_many_keys();

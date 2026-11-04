@@ -1895,6 +1895,23 @@ void *vmalloc_user(unsigned long size)
 EXPORT_SYMBOL(vmalloc_user);
 
 /**
+ * vmalloc_user_node_flags - allocate zeroed user-mappable memory on a node
+ * @size: allocation size
+ * @node: NUMA node
+ * @flags: page allocator flags
+ *
+ * Return: pointer to the allocated memory or %NULL on error
+ */
+void *vmalloc_user_node_flags(unsigned long size, int node, gfp_t flags)
+{
+	return __vmalloc_node_range(size, SHMLBA, VMALLOC_START, VMALLOC_END,
+				    flags | __GFP_ZERO, PAGE_KERNEL,
+				    VM_USERMAP, node,
+				    __builtin_return_address(0));
+}
+EXPORT_SYMBOL(vmalloc_user_node_flags);
+
+/**
  *	vmalloc_node  -  allocate memory on a specific node
  *	@size:		allocation size
  *	@node:		numa node
@@ -2786,4 +2803,3 @@ static int __init proc_vmalloc_init(void)
 module_init(proc_vmalloc_init);
 
 #endif
-

@@ -267,6 +267,7 @@ enum bpf_attach_type {
 /* Flags for accessing BPF object */
 #define BPF_F_RDONLY		(1U << 3)
 #define BPF_F_WRONLY		(1U << 4)
+#define BPF_F_MMAPABLE		(1U << 10)
 #define BPF_F_RDONLY_PROG	(1U << 7)
 
 /* Flag for stack_map, store build_id+offset instead of pointer */
