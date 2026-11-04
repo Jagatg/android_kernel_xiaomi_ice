@@ -127,6 +127,7 @@ enum bpf_map_type {
 	BPF_MAP_TYPE_SOCKHASH,
 	BPF_MAP_TYPE_CGROUP_STORAGE,
 	BPF_MAP_TYPE_REUSEPORT_SOCKARRAY,
+	BPF_MAP_TYPE_SK_STORAGE = 24,
 	BPF_MAP_TYPE_DEVMAP_HASH = 25,
 	BPF_MAP_TYPE_RINGBUF = 27,
 };
@@ -272,6 +273,7 @@ enum bpf_attach_type {
 
 /* Flag for stack_map, store build_id+offset instead of pointer */
 #define BPF_F_STACK_BUILD_ID	(1U << 5)
+#define BPF_SK_STORAGE_GET_F_CREATE	(1ULL << 0)
 
 enum bpf_stack_build_id_status {
 	/* user space need an empty entry to identify end of a trace */
