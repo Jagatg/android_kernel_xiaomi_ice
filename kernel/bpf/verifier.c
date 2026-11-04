@@ -1933,7 +1933,9 @@ static int check_mem_access(struct bpf_verifier_env *env, int insn_idx, u32 regn
 			mark_reg_unknown(env, regs, value_regno);
 
 	} else if (type_is_sk_pointer(reg->type)) {
-		struct bpf_insn_access_aux info = {};
+		struct bpf_insn_access_aux info = {
+			.reg_type = SCALAR_VALUE,
+		};
 		bool valid;
 
 		if (t == BPF_WRITE) {

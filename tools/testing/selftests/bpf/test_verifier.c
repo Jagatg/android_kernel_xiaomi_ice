@@ -9963,6 +9963,23 @@ static struct bpf_test tests[] = {
 		.errstr = "math between ctx pointer and register with unbounded min value is not allowed",
 	},
 	{
+		"cgroup sock storage helper is available",
+		.insns = {
+			BPF_MOV64_REG(BPF_REG_6, BPF_REG_1),
+			BPF_LD_MAP_FD(BPF_REG_1, 0),
+			BPF_MOV64_REG(BPF_REG_2, BPF_REG_6),
+			BPF_MOV64_IMM(BPF_REG_3, 0),
+			BPF_MOV64_IMM(BPF_REG_4, BPF_SK_STORAGE_GET_F_CREATE),
+			BPF_EMIT_CALL(BPF_FUNC_sk_storage_get),
+			BPF_MOV64_IMM(BPF_REG_0, 1),
+			BPF_EXIT_INSN(),
+		},
+		.fixup_map1 = { 1 },
+		.result = REJECT,
+		.errstr = "cannot pass map_type 1 into func bpf_sk_storage_get",
+		.prog_type = BPF_PROG_TYPE_CGROUP_SOCK,
+	},
+	{
 		"bpf_exit with invalid return code. test1",
 		.insns = {
 			BPF_LDX_MEM(BPF_W, BPF_REG_0, BPF_REG_1, 0),
